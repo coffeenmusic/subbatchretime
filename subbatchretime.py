@@ -10,6 +10,12 @@ class SubBatchRetime():
         """
         Parameters
         ----------
+        seconds_offset : float or list
+            if float: seconds to offset, use negative values to shift closer to the beginning
+            if list: list should be a list of tuples
+                (start_time, delta)
+                start_time=at what time in seconds to start shifting by delta
+                delta= amount of time to shift by in seconds
         sub_dir : str
             path of directory containing one or multiple subtitle files
         """
@@ -28,11 +34,25 @@ class SubBatchRetime():
         line_list = self.__chunk_sub_idx_to_list(self._file_to_line_list(file)) 
         assert delimiter in line_list[0][1], 'Column index 1 does not match time str format expected.'
         
+        multi_time = type(self.offset) == list
+        multi_idx = 0
+        
+        offset = 0 if multi_time else self.offset
+        
         for i, row in enumerate(line_list):
             time_str = row[time_col_idx]
             start, stop = self._srt_time_to_seconds(time_str)
-            start += self.offset
-            stop += self.offset
+            
+            if multi_time and multi_idx < len(self.offset):
+                delta_start, delta = self.offset[multi_idx]
+                if start >= delta_start:
+                    offset = delta
+                    multi_idx += 1
+            
+            start += offset
+            stop += offset
+            
+            assert start > 0, 'Delta time too large, negative start time created.'
             
             start_str = self._seconds_to_timestr(start)
             stop_str = self._seconds_to_timestr(stop)
