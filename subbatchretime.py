@@ -1,6 +1,5 @@
 import argparse
 import os
-import datetime
         
 
 class SubBatchRetime():
@@ -76,10 +75,10 @@ class SubBatchRetime():
             file.writelines(export)
             
     def _seconds_to_timestr(self, s):
-        time_str = str(datetime.timedelta(seconds=s))[:-3].replace('.', ',')
-        if len(time_str.split(':')[0]) == 1:
-            time_str = '0' + time_str
-        return time_str
+        hours, remainder = divmod(s, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        millsec = int(1000*(seconds - int(seconds)))
+        return '{:02}:{:02}:{:02},{:03}'.format(int(hours), int(minutes), int(seconds), millsec)
     
     def _srt_time_to_seconds(self, time_line):
         def timestr_to_sec(time_str):
