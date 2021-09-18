@@ -76,7 +76,10 @@ class SubBatchRetime():
             file.writelines(export)
             
     def _seconds_to_timestr(self, s):
-        return str(datetime.timedelta(seconds=s))[:-3].replace('.', ',')
+        time_str = str(datetime.timedelta(seconds=s))[:-3].replace('.', ',')
+        if len(time_str.split(':')[0]) == 1:
+            time_str = '0' + time_str
+        return time_str
     
     def _srt_time_to_seconds(self, time_line):
         def timestr_to_sec(time_str):
