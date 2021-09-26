@@ -1,5 +1,6 @@
 import argparse
 import os
+import numpy as np
         
 
 class SubBatchRetime():
@@ -30,11 +31,14 @@ class SubBatchRetime():
             self._fix_single_file(file)
         
     def _fix_single_file(self, file, time_col_idx=1, delimiter=' --> ', save_dir='Retimed'):
-        line_list = self.__chunk_sub_idx_to_list(self._file_to_line_list(file)) 
+        line_list = self._chunk_sub_idx_to_list(self._file_to_line_list(file)) 
         assert delimiter in line_list[0][1], 'Column index 1 does not match time str format expected.'
         
         multi_time = type(self.offset) == list
         multi_idx = 0
+        
+        if multi_time:
+            self.offset = self._optimize_retiming(line_list)
         
         offset = 0 if multi_time else self.offset
         
@@ -62,6 +66,41 @@ class SubBatchRetime():
  
         save_path = os.path.join(save_dir, os.path.basename(file))
         self._export_line_list(save_path, line_list)
+        
+    def _optimize_retiming(self, line_list):
+        gaps = self._get_delta_times(line_list)
+
+        best_retime = []
+        for cnt, (t, total_delta) in enumerate(self.offset):
+            delta = total_delta - sum([d for _, d in self.offset[:cnt]])
+
+            gap_times, gap_deltas = zip(*[(ti, d) for ti, d in gaps if d > abs(delta)])
+
+            if len(gap_times) == 0:
+                print(f'No time gap large enough for requested shift of {delta}. This will result in overlap of times in the subtitle file.')
+                best_retime += [(gap_times[idx], gap_deltas[idx])]
+            else:
+                idx = np.argmin(np.array(gap_times) - abs(delta))
+                best_retime += [(gap_times[idx], total_delta)]
+
+                # Time no longer available, so remove from options
+                gaps.pop(gaps.index((gap_times[idx], gap_deltas[idx])))
+                
+        return best_retime
+        
+    def _get_delta_times(self, line_list, time_col_idx=1):
+        time_gaps = []
+
+        prev_stop = 0
+        for row in line_list:
+            time_str = row[time_col_idx]
+            start, stop = self._srt_time_to_seconds(time_str)
+            
+            if start - prev_stop > 0:
+                delta = start - prev_stop
+                time_gaps += [(start - delta, delta)]
+            prev_stop = stop
+        return time_gaps
         
     def _export_line_list(self, filename, line_list):
         
@@ -99,7 +138,7 @@ class SubBatchRetime():
                 line_list += [line.replace('\n', '')]
         return line_list
     
-    def __chunk_sub_idx_to_list(self, sub_line_list):
+    def _chunk_sub_idx_to_list(self, sub_line_list):
         """
             Pass in a list where each line is a line in the subtitle file
             Example:
